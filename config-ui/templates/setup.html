@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Create your account - Foundry Admin{% endblock %}
+{% block content %}
+<div class="wizard" id="setup-wizard">
+    <div class="wizard-header">
+        <button type="button" class="wizard-back" aria-label="Back" hidden>
+            <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <div class="wizard-dots">
+            <span class="wizard-dot"></span>
+            <span class="wizard-dot"></span>
+            <span class="wizard-dot"></span>
+            <span class="wizard-dot"></span>
+        </div>
+    </div>
+
+    <div class="wizard-viewport">
+        <form method="post" autocomplete="off">
+            <div class="wizard-track">
+
+                <section class="wizard-step">
+                    <h1 class="wizard-title">Create your admin account</h1>
+                    <p class="wizard-subtitle">
+                        This is a one-time step - nothing is configured yet. Once you create an
+                        account, it's saved and you'll log in with it from now on.
+                    </p>
+
+                    <div class="wizard-body">
+                        <div class="field">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" autofocus autocomplete="username">
+                        </div>
+                        <div class="field">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" autocomplete="new-password">
+                            <div class="help">At least 8 characters.</div>
+                        </div>
+                        <div class="field">
+                            <label for="confirm">Confirm password</label>
+                            <input type="password" id="confirm" name="confirm" autocomplete="new-password">
+                        </div>
+
+                        <div class="wizard-error" data-step-error></div>
+                        <button type="button" class="wizard-continue" data-next>Continue</button>
+                    </div>
+                </section>
+
+                <section class="wizard-step">
+                    <h1 class="wizard-title">Add a recovery email</h1>
+                    <p class="wizard-subtitle">
+                        If you're ever locked out, we'll send a one-time code here. Use an address
+                        you can actually check - not the one you'll set up for sending, next.
+                    </p>
+
+                    <div class="wizard-body">
+                        <div class="field">
+                            <label for="ADMIN_UI_RECOVERY_EMAIL">Your Email Address</label>
+                            <input type="email" id="ADMIN_UI_RECOVERY_EMAIL" name="ADMIN_UI_RECOVERY_EMAIL" autocomplete="email">
+                        </div>
+
+                        <div class="wizard-error" data-step-error></div>
+                        <button type="button" class="wizard-continue" data-next>Continue</button>
+                    </div>
+                </section>
+
+                <section class="wizard-step">
+                    <h1 class="wizard-title">How should we send your codes?</h1>
+                    <p class="wizard-subtitle">
+                        Pick the email provider you'll send from. We'll fill in the technical
+                        settings and take you straight to the right place to get a password for it.
+                    </p>
+
+                    <div class="wizard-body">
+                        <div class="field">
+                            <label for="email-provider">Email Provider</label>
+                            <select id="email-provider">
+                                <option value="gmail">Gmail</option>
+                                <option value="outlook">Outlook / Hotmail / Live</option>
+                                <option value="yahoo">Yahoo Mail</option>
+                                <option value="icloud">iCloud Mail</option>
+                                <option value="other">Other / not listed</option>
+                            </select>
+                        </div>
+
+                        <div class="wizard-error" data-step-error></div>
+                        <button type="button" class="wizard-continue" data-next>Continue</button>
+                    </div>
+                </section>
+
+                <section class="wizard-step">
+                    <h1 class="wizard-title">Connect your sending email</h1>
+                    <p class="wizard-subtitle" id="provider-instructions"></p>
+
+                    <div class="wizard-body">
+                        <a href="#" id="provider-link" class="provider-link" target="_blank" rel="noopener">
+                            Get your app password
+                            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2"><path d="M7 17 17 7M8 7h9v9"/></svg>
+                        </a>
+
+                        <div class="field">
+                            <label for="SMTP_USERNAME">Sending Email Address</label>
+                            <input type="email" id="SMTP_USERNAME" name="SMTP_USERNAME" autocomplete="email">
+                        </div>
+                        <div class="field">
+                            <label for="SMTP_PASSWORD">Email App Password</label>
+                            <input type="password" id="SMTP_PASSWORD" name="SMTP_PASSWORD" autocomplete="new-password">
+                            <div class="help">Not your normal email password - see the link above.</div>
+                        </div>
+
+                        {# Auto-filled from the provider picked in the previous step and
+                           hidden for any known provider. bindEmailProviderPicker (see
+                           email-providers.js) only shows these, and marks them required,
+                           when "Other / not listed" is selected. #}
+                        <div class="field">
+                            <label for="SMTP_HOST">Email Server</label>
+                            <input type="text" id="SMTP_HOST" name="SMTP_HOST">
+                        </div>
+                        <div class="field">
+                            <label for="SMTP_PORT">Email Server Port</label>
+                            <input type="text" id="SMTP_PORT" name="SMTP_PORT">
+                        </div>
+
+                        <div class="wizard-error" data-step-error></div>
+                        <button type="submit" class="wizard-continue">Finish Setup</button>
+                    </div>
+                </section>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/email-providers.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/custom-select.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/wizard.js') }}" defer></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        bindEmailProviderPicker(
+            document.getElementById("email-provider"),
+            document.getElementById("SMTP_HOST"),
+            document.getElementById("SMTP_PORT"),
+            document.getElementById("provider-instructions"),
+            document.getElementById("provider-link")
+        );
+
+        function validateStep(index) {
+            if (index === 0) {
+                var username = document.getElementById("username").value.trim();
+                var password = document.getElementById("password").value;
+                var confirm = document.getElementById("confirm").value;
+                if (!username || !password) return "Username and password are required.";
+                if (password.length < 8) return "Password must be at least 8 characters.";
+                if (password !== confirm) return "Passwords don't match.";
+                return null;
+            }
+            if (index === 1) {
+                var email = document.getElementById("ADMIN_UI_RECOVERY_EMAIL").value.trim();
+                if (!email || email.indexOf("@") === -1) return "Enter a valid email address.";
+                return null;
+            }
+            if (index === 3) {
+                var sendAddr = document.getElementById("SMTP_USERNAME").value.trim();
+                var appPass = document.getElementById("SMTP_PASSWORD").value;
+                if (!sendAddr || sendAddr.indexOf("@") === -1) return "Enter a valid sending email address.";
+                if (!appPass) return "Enter the app password for this account (not your regular one).";
+                var hostField = document.getElementById("SMTP_HOST");
+                var portField = document.getElementById("SMTP_PORT");
+                if (hostField && hostField.required && !hostField.value.trim()) return "Enter your email provider's SMTP server address.";
+                if (portField && portField.required && !portField.value.trim()) return "Enter your email provider's SMTP port.";
+                return null;
+            }
+            return null;
+        }
+
+        initWizard(document.getElementById("setup-wizard"), validateStep);
+    });
+</script>
+{% endblock %}

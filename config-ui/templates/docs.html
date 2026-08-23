@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} - Docs{% endblock %}
+{% block page_title %}Docs: {{ page_title }}{% endblock %}
+{% block wrap_class %}wide{% endblock %}
+{% block content_class %}wide{% endblock %}
+{% block content %}
+<div class="docs-layout">
+    <nav class="docs-nav">
+        {% for slug, title, _path in pages %}
+        <a href="{{ url_for('docs_page', slug=slug) }}" class="{{ 'active' if slug == active_slug else '' }}">{{ title }}</a>
+        {% endfor %}
+    </nav>
+    <article class="docs-content">
+        {{ content_html | safe }}
+    </article>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Fetches doc pages in place instead of doing a full navigation, so
+        // moving between them feels like the Account page's tabs (see the
+        // matching script there) rather than a page load - same fade, no
+        // round-trip flash. The URL, title, and back/forward still all work
+        // normally; this is progressive enhancement over the plain <a
+        // href="/docs/..."> links, which still work as real navigations if
+        // JS fails or the request errors.
+        var nav = document.querySelector(".docs-nav");
+        var contentEl = document.querySelector(".docs-content");
+        var scrollEl = document.querySelector(".content-area");
+        var titleEl = document.getElementById("page-title");
+        var FADE_MS = document.documentElement.classList.contains("reduce-motion") ? 0 : 160;
+        var cache = {};
+        cache[{{ active_slug | tojson }}] = { title: {{ page_title | tojson }}, html: contentEl.innerHTML };
+
+        function slugFromPath(path) {
+            var m = path.match(/^\/docs\/([^/?#]+)/);
+            return m ? m[1] : null;
+        }
+
+        function currentSlug() { return slugFromPath(location.pathname); }
+
+        function setActiveNav(slug) {
+            Array.prototype.forEach.call(nav.querySelectorAll("a"), function (a) {
+                a.classList.toggle("active", slugFromPath(a.getAttribute("href")) === slug);
+            });
+            // On the mobile tab-strip layout the nav can scroll horizontally,
+            // so the active tab can land off-screen - center it into view.
+            var active = nav.querySelector("a.active");
+            if (active) active.scrollIntoView({ block: "nearest", inline: "center" });
+        }
+
+        function applyEntry(slug, entry, hash) {
+            contentEl.innerHTML = entry.html;
+            document.title = entry.title + " - Docs";
+            if (titleEl) titleEl.textContent = "Docs: " + entry.title;
+            setActiveNav(slug);
+            // .docs-content itself never scrolls (no overflow set on it) -
+            // .content-area is the actual scrolling element, so that's what
+            // needs resetting; scrollTop on the wrong element was a silent
+            // no-op, which is why switching docs while scrolled down used to
+            // leave you scrolled down on the new page instead of landing at
+            // its top.
+            var target = hash && document.getElementById(hash.slice(1));
+            if (target) target.scrollIntoView({ block: "start" });
+            else scrollEl.scrollTop = 0;
+        }
+
+        function swapTo(slug, entry, hash) {
+            if (!FADE_MS) { applyEntry(slug, entry, hash); return; }
+            contentEl.style.opacity = "0";
+            setTimeout(function () {
+                applyEntry(slug, entry, hash);
+                contentEl.style.opacity = "0";
+                requestAnimationFrame(function () { contentEl.style.opacity = "1"; });
+            }, FADE_MS);
+        }
+
+        function loadSlug(slug, hash, push) {
+            var url = "/docs/" + slug + (hash || "");
+            function done(entry) {
+                cache[slug] = entry;
+                if (push) history.pushState({ slug: slug }, "", url);
+                swapTo(slug, entry, hash);
+            }
+            if (cache[slug]) { done(cache[slug]); return; }
+            fetch("/api/docs/" + encodeURIComponent(slug))
+                .then(function (res) { if (!res.ok) throw new Error("failed"); return res.json(); })
+                .then(function (data) { done({ title: data.title, html: data.html }); })
+                .catch(function () { window.location.href = url; });
+        }
+
+        document.addEventListener("click", function (evt) {
+            if (evt.defaultPrevented || evt.button !== 0 || evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) return;
+            var link = evt.target.closest && evt.target.closest('a[href^="/docs/"]');
+            if (!link || link.target === "_blank") return;
+            var href = link.getAttribute("href");
+            var hashIdx = href.indexOf("#");
+            var path = hashIdx === -1 ? href : href.slice(0, hashIdx);
+            var hash = hashIdx === -1 ? "" : href.slice(hashIdx);
+            var slug = slugFromPath(path);
+            if (!slug) return;
+            evt.preventDefault();
+            if (slug === currentSlug()) {
+                var target = hash && document.getElementById(hash.slice(1));
+                if (target) { target.scrollIntoView({ block: "start" }); history.pushState({ slug: slug }, "", href); }
+                return;
+            }
+            loadSlug(slug, hash, true);
+        });
+
+        window.addEventListener("popstate", function () {
+            var slug = currentSlug();
+            if (!slug) return;
+            if (cache[slug]) { swapTo(slug, cache[slug], location.hash); return; }
+            fetch("/api/docs/" + encodeURIComponent(slug))
+                .then(function (res) { if (!res.ok) throw new Error("failed"); return res.json(); })
+                .then(function (data) {
+                    var entry = { title: data.title, html: data.html };
+                    cache[slug] = entry;
+                    swapTo(slug, entry, location.hash);
+                })
+                .catch(function () { location.reload(); });
+        });
+
+        setActiveNav(currentSlug());
+    });
+</script>
+{% endblock %}

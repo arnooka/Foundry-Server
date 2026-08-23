@@ -1,0 +1,737 @@
+:root {
+    color-scheme: dark;
+    --bg: #14161a;
+    --panel: #1d2026;
+    --border: #2c303a;
+    --text: #e6e8eb;
+    --muted: #93989f;
+    --accent: #7c5cff;
+    --accent-hover: #6a4ce0;
+    --ok: #3ecf8e;
+    --err: #ff6b6b;
+    --warn: #ffb020;
+    --teal: #2dd4bf;
+    --code-bg: #101215;
+    --input-bg: #101215;
+    --hover-overlay: rgba(255,255,255,0.04);
+    --hover-overlay-strong: rgba(255,255,255,0.06);
+    --shimmer-highlight: rgba(255,255,255,0.08);
+}
+/* Light theme, opt-in only via the Preferences toggle on the Account page.
+   Never auto-applied from the OS/browser, so a device's dark-mode setting
+   doesn't silently change this app. See static/js/preferences.js. */
+html.theme-light {
+    color-scheme: light;
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --border: #dfe2e8;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --accent: #6d4fe0;
+    --accent-hover: #5b3fd0;
+    --ok: #1f9d6e;
+    --err: #d9434d;
+    --warn: #b8790a;
+    --teal: #0f9488;
+    --code-bg: #eef0f3;
+    --input-bg: #f8f9fb;
+    --hover-overlay: rgba(0,0,0,0.035);
+    --hover-overlay-strong: rgba(0,0,0,0.05);
+    --shimmer-highlight: rgba(0,0,0,0.06);
+}
+* { box-sizing: border-box; }
+/* Smooths the dark/light theme toggle (see html.theme-light above); without
+   it, every element using a --variable color snaps instantly the moment the
+   class flips. Some elements (inputs, sidebar, nav links) set their own more
+   specific transition for hover/press feedback, which overrides this, but
+   that's fine since they already animate the same properties. */
+*, *::before, *::after {
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+/* Images and links are natively draggable in every browser. Press-and-drag on
+   a logo/icon or nav link starts a real HTML5 drag session, and since
+   nothing here is a drop target, that session can fail to end cleanly and
+   leave the page looking stuck until it's cancelled. Disabled globally since
+   nothing here is meant to be dragged out. */
+img, a { -webkit-user-drag: none; user-drag: none; }
+/* Same failure mode, but via text selection instead of image drag: dragging
+   across button-like chrome can start a native selection that interferes
+   with the click. Actual content stays selectable - only interactive chrome
+   opts out. */
+button, .nav-link, .docs-nav a, .pref-toggle-btn, .sidebar-collapse-btn,
+.sidebar-close-btn, .hamburger, .wizard-back, .wizard-dot {
+    -webkit-user-select: none; user-select: none;
+}
+body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+a { color: inherit; }
+
+/* Motion: entrance fades/pulses only, no hover-triggered sliding anywhere in
+   this file. Hover states change color/background only. Animations are on
+   by default regardless of the OS/browser's reduce-motion preference -
+   that's deliberate, see the Preferences toggle instead. */
+html.reduce-motion, html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+}
+
+/* Cross-document page navigation (sidebar links, Docs pages, Settings, etc.)
+   gets a fade-out-then-fade-in on the content area instead of the hard cut a
+   normal full page load gives you. .content-area's view-transition-name
+   (below) pulls it into its own transition group so only the content
+   cross-fades; sidebar/topbar look identical before and after, so they stay
+   in the default whole-page group where a crossfade between pixel-identical
+   snapshots is a no-op. Browsers without view-transition support just get
+   the plain hard cut. */
+@view-transition {
+    navigation: auto;
+}
+/* The root group covers everything outside .content-area - sidebar and
+   topbar. It's only a no-op crossfade if old/new snapshots are
+   pixel-identical, and they rarely are: the active nav-link highlight moves
+   and the <h1> text changes on every navigation. Left animated, that plays a
+   second whole-page crossfade on top of the intended content-only one,
+   which reads as flicker. So root is a hard cut and only page-content
+   animates. */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+::view-transition-old(page-content),
+::view-transition-new(page-content) {
+    animation-duration: 0.18s;
+    animation-timing-function: ease;
+}
+html.reduce-motion::view-transition-group(*),
+html.reduce-motion::view-transition-old(*),
+html.reduce-motion::view-transition-new(*) {
+    animation-duration: 0.001ms !important;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+    50% { box-shadow: 0 0 0 3px transparent; opacity: 0.65; }
+}
+@keyframes skeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.dot.loading { background: var(--border); }
+.skeleton {
+    display: inline-block;
+    height: 0.9em;
+    min-width: 48px;
+    border-radius: 4px;
+    vertical-align: middle;
+    background: linear-gradient(90deg, var(--border) 25%, var(--shimmer-highlight) 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.4s ease-in-out infinite;
+    color: transparent;
+}
+h1 { font-size: 1.4rem; margin-bottom: 1.5rem; }
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+.field-required { color: var(--err); }
+.help { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+input[type=text], input[type=password], input[type=email], select {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 0.15s ease, background-color 0.25s ease, color 0.25s ease;
+}
+input[type=text]:focus, input[type=password]:focus, input[type=email]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+/* Bare fallback for a <select> before/without custom-select.js's
+   enhancement below. Uses the same right-edge gap as the themed trigger,
+   instead of the browser's native arrow sitting flush against the border. */
+select {
+    cursor: pointer;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    padding-right: 2.1rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2393989f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 12px;
+}
+select::-ms-expand { display: none; }
+.field { margin-bottom: 1.1rem; }
+
+/* Custom themed dropdown for <select> elements (static/js/custom-select.js).
+   A native <select>'s open options popup is drawn by the OS/browser and
+   can't be restyled or animated in any browser this app needs to support,
+   so this swaps in a themed trigger + menu built from real DOM instead. The
+   original <select> stays in the document, invisible but still holding the
+   live value, so anything that already reads/writes it (email provider
+   auto-fill, wizard step focus/validation) keeps working unmodified - this
+   just adds a themed UI in front of it. */
+.custom-select { position: relative; }
+.custom-select select {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; pointer-events: none;
+}
+.custom-select-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: var(--input-bg); color: var(--text);
+    font-size: 0.95rem; font-family: inherit; text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.25s ease, color 0.25s ease;
+}
+/* background/color repeated on every state below because the global button/
+   button:hover/button:active rules (this trigger is a real <button>) carry
+   a pseudo-class, which outranks a plain .custom-select-trigger class on
+   specificity. Without restating them here, hovering or opening the trigger
+   would flash the accent-purple button fill instead of staying
+   input-styled. */
+.custom-select-trigger:hover { background: var(--input-bg); color: var(--text); border-color: var(--muted); }
+.custom-select-trigger:focus-visible { outline: none; background: var(--input-bg); color: var(--text); border-color: var(--accent); }
+.custom-select-trigger:active { background: var(--input-bg); color: var(--text); }
+.custom-select.open .custom-select-trigger { background: var(--input-bg); color: var(--text); border-color: var(--accent); }
+.custom-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-select-chevron { width: 12px; height: 12px; flex-shrink: 0; color: var(--muted); transition: transform 0.2s ease; }
+.custom-select.open .custom-select-chevron { transform: rotate(180deg); }
+
+/* The menu is appended to <body> (see custom-select.js) rather than left
+   nested in .custom-select, and positioned with fixed coordinates computed
+   from the trigger's own rect. That's needed because it can open from
+   inside the wizard, whose .wizard-track is translateX()'d to slide steps
+   and so establishes its own containing block for fixed-position
+   descendants - nesting the menu there would offset it by however far the
+   track is currently slid instead of anchoring it to the trigger. */
+.custom-select-menu {
+    position: fixed;
+    z-index: 60;
+    margin: 0; padding: 0.35rem; list-style: none;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    max-height: 240px; overflow-y: auto;
+    opacity: 0; visibility: hidden; transform: scale(0.97) translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.custom-select-menu.open { opacity: 1; visibility: visible; transform: scale(1) translateY(0); }
+.custom-select-option {
+    padding: 0.5rem 0.6rem; border-radius: 5px; font-size: 0.9rem; color: var(--text);
+    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.custom-select-option.highlighted { background: var(--hover-overlay-strong); }
+.custom-select-option.selected { color: var(--accent); font-weight: 600; }
+button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.65rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.08s ease;
+    /* Pre-promotes this to its own compositing layer instead of only when
+       :active kicks in. Creating the layer and clipping it to the
+       border-radius in the same frame the transform starts is what causes
+       the corners to flash square for a frame on press in Chromium. */
+    will-change: transform;
+}
+button:hover { background: var(--accent-hover); }
+button:active { transform: scale(0.96); }
+/* e.g. Password Reset's Save button, disabled until both fields are filled
+   and valid. Needs to visibly read as inert, not just block clicks, or a
+   greyed-out cursor would be the only sign anything's wrong. */
+button:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+button:disabled:hover { background: var(--border); }
+button:disabled:active { transform: none; }
+button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+button.secondary:hover { background: var(--panel); }
+.status-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.status { font-size: 0.9rem; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; transition: background-color 0.3s ease; }
+.dot.running { background: var(--ok); color: var(--ok); animation: pulseGlow 2.2s ease-in-out infinite; }
+.dot.restarting { background: var(--warn); color: var(--warn); animation: pulseGlow 1.1s ease-in-out infinite; }
+.dot.stopped, .dot.unknown { background: var(--err); }
+a.url { color: var(--accent); word-break: break-all; }
+.flash { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; white-space: pre-wrap; animation: fadeInUp 0.25s ease backwards; }
+.flash.success { background: rgba(62,207,142,0.12); border: 1px solid var(--ok); }
+.flash.error { background: rgba(255,107,107,0.12); border: 1px solid var(--err); }
+
+/* Confirmation modal */
+.modal-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s;
+}
+.modal-overlay.open { opacity: 1; visibility: visible; }
+.modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: scale(0.96) translateY(6px);
+    transition: transform 0.15s ease, background-color 0.25s ease, border-color 0.25s ease;
+}
+.modal-overlay.open .modal { transform: scale(1) translateY(0); }
+.modal h2 { font-size: 1.05rem; margin: 0 0 0.5rem; }
+.change-list { margin: 1rem 0; padding-left: 1.1rem; font-size: 0.9rem; }
+.change-list li { margin-bottom: 0.4rem; word-break: break-word; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem; flex-wrap: wrap; }
+
+/* Metric cards */
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1.1rem; margin-bottom: 2rem; }
+.metric-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem;
+    animation: fadeInUp 0.35s ease backwards;
+}
+.metric-card:nth-child(1) { animation-delay: 0.02s; }
+.metric-card:nth-child(2) { animation-delay: 0.06s; }
+.metric-card:nth-child(3) { animation-delay: 0.10s; }
+.metric-card:nth-child(4) { animation-delay: 0.14s; }
+.metric-card:nth-child(5) { animation-delay: 0.18s; }
+.metric-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+.metric-label { font-size: 0.8rem; color: var(--muted); }
+.metric-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.metric-icon svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.metric-icon.blue { background: rgba(124,92,255,0.15); color: var(--accent); }
+.metric-icon.green { background: rgba(62,207,142,0.15); color: var(--ok); }
+.metric-icon.orange { background: rgba(255,176,32,0.15); color: var(--warn); }
+.metric-icon.red { background: rgba(255,107,107,0.15); color: var(--err); }
+.metric-icon.teal { background: rgba(45,212,191,0.15); color: var(--teal); }
+.metric-value { font-size: 1.55rem; font-weight: 700; margin-bottom: 0.2rem; transition: color 0.2s ease; }
+.metric-sub { font-size: 0.78rem; color: var(--muted); transition: color 0.2s ease; }
+.metric-value.metric-flash, .metric-sub.metric-flash { color: var(--accent); }
+.panel h2.section-title { font-size: 1rem; margin: 0 0 1rem; }
+.live-indicator { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--muted); margin-bottom: 1rem; }
+.live-indicator .dot { margin-right: 0; }
+
+/* App shell: sidebar + topbar, used only for logged-in pages */
+/* Fixed-height shell: sidebar and topbar never scroll, only .content-area
+   does, so long content (Docs in particular) doesn't drag the nav/topbar
+   off screen with it. */
+html, body { height: 100%; }
+/* 100dvh falls back to 100vh where unsupported (an invalid value drops the
+   whole declaration, leaving the one before it) and tracks the browser
+   chrome's actual on-screen size on mobile. Plain 100vh is the largest
+   possible viewport (address bar collapsed), so the shell can end up taller
+   than what's visible whenever the address bar is showing, overflowing the
+   real window and letting the outer page scroll instead of .content-area -
+   which drags the topbar/sidebar off screen with it despite the fixed-shell
+   design above. */
+.app-shell { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
+.sidebar-toggle-checkbox { position: absolute; opacity: 0; pointer-events: none; }
+.hamburger { display: none; cursor: pointer; padding: 0.6rem; margin: -0.6rem; font-size: 1.15rem; color: var(--muted); }
+.sidebar-backdrop { display: none; }
+.sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.2s ease, padding 0.2s ease, background-color 0.25s ease, border-color 0.25s ease;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.sidebar-header {
+    /* The logo is centered across the header's full width. The toggle
+       button is taken out of flow via absolute positioning so it never
+       competes with the logo for space or pulls it off-center. */
+    position: relative;
+    display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+    margin-bottom: 2rem; padding: 0 0.5rem;
+    transition: margin 0.2s ease, padding 0.2s ease;
+}
+.brand { display: flex; align-items: center; justify-content: center; }
+.brand-logo { width: 40px; height: 40px; flex-shrink: 0; display: block; }
+.brand-logo-lg { width: 96px; height: 96px; display: block; }
+/* Swapped by the app's own theme class (set via the Account page toggle),
+   not prefers-color-scheme, since the panel/page background these sit on
+   follows that same in-app choice, not the OS setting. */
+.brand-logo-light { display: none; }
+html.theme-light .brand-logo-dark { display: none; }
+html.theme-light .brand-logo-light { display: block; }
+.sidebar-collapse-btn,
+.sidebar-close-btn {
+    position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%);
+    background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer;
+    padding: 0.35rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.08s ease, border-color 0.2s ease;
+    will-change: transform;
+}
+.sidebar-close-btn { display: none; text-decoration: none; }
+.sidebar-collapse-btn:hover, .sidebar-close-btn:hover { background: var(--hover-overlay-strong); color: var(--text); }
+.sidebar-collapse-btn:active { transform: translateY(-50%) scale(0.92); }
+.sidebar-collapse-btn .toggle-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; transition: transform 0.25s ease; }
+.sidebar-close-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.nav-section { margin-bottom: 1.5rem; transition: margin 0.2s ease; }
+.nav-label {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+    padding: 0 0.6rem; margin-bottom: 0.5rem; overflow: hidden; white-space: nowrap;
+    max-height: 20px; opacity: 1;
+    transition: opacity 0.15s ease, max-height 0.2s ease, margin 0.2s ease, color 0.25s ease;
+}
+.nav-link {
+    display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.6rem; border-radius: 8px;
+    color: var(--muted); text-decoration: none; font-size: 0.87rem; margin-bottom: 0.1rem;
+    transition: background-color 0.15s ease, color 0.15s ease, justify-content 0.2s ease, gap 0.2s ease, padding 0.2s ease;
+    will-change: transform;
+}
+.nav-link svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+.nav-link:hover { background: var(--hover-overlay); color: var(--text); }
+.nav-link.active { background: var(--accent); color: white; }
+.nav-link:active { transform: scale(0.98); }
+.nav-text { display: inline-block; white-space: nowrap; overflow: hidden; max-width: 160px; opacity: 1; transition: opacity 0.15s ease, max-width 0.2s ease; }
+.sidebar-footer { margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+/* Collapsed icon-rail state, desktop only. Mobile keeps the full-width
+   overlay drawer below, controlled separately by the hamburger. */
+@media (min-width: 861px) {
+    /* Wide enough for the logo + toggle button to stay side by side as a
+       row in both states, avoiding a flip to a column layout for
+       .sidebar-header, which can't be transitioned and would jump instantly
+       instead of animating with everything else. A little wider than a
+       bare icon rail needs, with tighter side padding, so the logo and
+       toggle button both fit at a legible size without overlapping. */
+    html.sidebar-collapsed .sidebar { width: 96px; padding: 1.5rem 0.6rem; }
+    html.sidebar-collapsed .sidebar-header { margin-bottom: 1.25rem; padding: 0; }
+    html.sidebar-collapsed .nav-section { margin-bottom: 0.25rem; }
+    html.sidebar-collapsed .nav-text {
+        opacity: 0; max-width: 0; margin: 0; pointer-events: none;
+    }
+    html.sidebar-collapsed .nav-label {
+        opacity: 0; max-height: 0; margin: 0;
+    }
+    html.sidebar-collapsed .nav-link {
+        justify-content: center; gap: 0; padding-left: 0; padding-right: 0;
+    }
+    html.sidebar-collapsed .brand-logo { width: 26px; height: 26px; }
+    /* Back into normal flow next to the now-shrunk logo, instead of
+       overlapping it via absolute positioning, which made it invisible
+       before. Its own border/background keeps it reading as a button
+       rather than just another icon. */
+    html.sidebar-collapsed .sidebar-collapse-btn {
+        position: static; transform: none; flex-shrink: 0;
+        border-color: var(--border);
+    }
+    html.sidebar-collapsed .sidebar-collapse-btn:active { transform: scale(0.92); }
+    html.sidebar-collapsed .sidebar-collapse-btn .toggle-icon { transform: rotate(180deg); }
+}
+.main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; }
+.topbar-app {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.1rem 2rem; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.topbar-app h1 { margin: 0; font-size: 1.15rem; }
+.content-area {
+    padding: 1.75rem 2rem; max-width: 1200px;
+    flex: 1; overflow-y: auto; min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    /* Named so it gets its own view-transition group (see @view-transition
+       below) instead of being lumped into the whole-document snapshot. This
+       is what makes only the content cross-fade between pages while the
+       sidebar/topbar, identical before and after, stay visually put. */
+    view-transition-name: page-content;
+    /* Only affects scrolls triggered from script (a plain .scrollTop = 0,
+       scrollTo(), scrollIntoView() with no explicit behavior); normal
+       wheel/touch/keyboard scrolling is untouched. Picked up by the
+       client-side doc-switch and Account-tab-switch scroll-to-top resets
+       (docs.html, account.html), so landing on new content also glides
+       back to the top instead of silently snapping there. */
+    scroll-behavior: smooth;
+}
+html.reduce-motion .content-area { scroll-behavior: auto; }
+.content-area.wide { max-width: none; }
+
+/* Simple centered layout, used for login/setup/forgot/reset (and Docs when
+   read before logging in) */
+.wrap { max-width: 480px; margin: 0 auto; padding: 3rem 1.5rem 2.5rem; }
+.wrap.wide { max-width: 1100px; }
+.logged-out-brand { display: flex; justify-content: center; margin-bottom: 1.5rem; }
+
+/* Docs viewer */
+.docs-layout { display: flex; gap: 2rem; align-items: flex-start; }
+.docs-nav { flex: 0 0 200px; position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.docs-nav a { color: var(--muted); text-decoration: none; font-size: 0.88rem; padding: 0.4rem 0.6rem; border-radius: 6px; }
+.docs-nav a:hover { background: var(--panel); color: var(--text); }
+.docs-nav a.active { background: var(--panel); color: var(--accent); font-weight: 600; }
+.docs-content {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.75rem 2rem;
+    transition: opacity 0.16s ease;
+}
+.docs-content h1, .docs-content h2, .docs-content h3 { line-height: 1.3; }
+.docs-content h1 { font-size: 1.5rem; margin-top: 0; }
+.docs-content h2 { font-size: 1.2rem; margin-top: 2rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+.docs-content h3 { font-size: 1.02rem; margin-top: 1.5rem; }
+.docs-content p, .docs-content li { line-height: 1.6; color: var(--text); }
+.docs-content a { color: var(--accent); }
+.docs-content code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.88em;
+    overflow-wrap: anywhere;
+}
+.docs-content pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+}
+.docs-content pre code { background: none; border: none; padding: 0; }
+.docs-content table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; display: block; overflow-x: auto; }
+.docs-content th, .docs-content td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; }
+.docs-content th { color: var(--muted); font-weight: 600; }
+.docs-content blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding: 0.2rem 1rem; color: var(--muted); }
+.docs-content hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+/* Account & Recovery reuses .docs-layout/.docs-nav/.docs-content for the
+   same navigable-like-docs look (including the mobile tab-strip nav below),
+   but its content is short form fields rather than long-form prose. So it's
+   capped to a comfortable form width instead of stretching across the full
+   pane, and centered in the leftover space rather than left-hugging it,
+   which read as lopsided when the pane is much wider than the form. */
+.account-panel { max-width: 560px; margin: 0 auto; transition: opacity 0.16s ease; }
+
+/* Foundry Settings wizard (settings.html): same comfortable form width as
+   .account-panel above, just without the docs-layout tab nav around it. */
+.settings-wizard-wrap { max-width: 560px; margin: 0 auto; }
+
+@media (max-width: 860px) {
+    .hamburger { display: block; }
+    .sidebar-collapse-btn { display: none; }
+    .sidebar-close-btn { display: flex; }
+    .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: 90;
+        transform: translateX(-100%); transition: transform 0.2s ease;
+    }
+    .sidebar-toggle-checkbox:checked ~ .sidebar { transform: translateX(0); }
+    /* Tap-outside-to-close backdrop. It's a <label for="sidebar-toggle">
+       like the hamburger and the in-drawer close button, so a plain click
+       toggles the checkbox closed with no JS needed. The sidebar itself
+       sits on top (z-index 90) so the drawer's own contents aren't covered
+       by this. */
+    .sidebar-toggle-checkbox:checked ~ .sidebar-backdrop {
+        display: block; position: fixed; inset: 0; z-index: 80;
+        background: rgba(0,0,0,0.5); cursor: default;
+        animation: fadeIn 0.2s ease;
+    }
+    .topbar-app { padding: 1rem; }
+    .topbar-app h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .content-area { padding: 1.25rem; }
+
+    /* Same breakpoint as the sidebar's own drawer switch above, so the docs
+       nav doesn't try to stay a squeezed sidebar-next-to-content layout in
+       the gap between "sidebar becomes a drawer" and "docs nav wraps." */
+    .docs-content { padding: 1.25rem; }
+    /* align-items switches to stretch here because the base rule's
+       flex-start (for the desktop row layout, where nav/content align to a
+       shared top rather than stretching to match heights) would otherwise
+       let .docs-nav grow to its natural content width in column mode
+       instead of being capped at the container's width - that was letting
+       the whole page overflow horizontally instead of the nav scrolling
+       internally. */
+    .docs-layout { flex-direction: column; gap: 1rem; align-items: stretch; }
+    .docs-nav {
+        /* This used to be position: static, which silently dropped the
+           sticky rule inherited from the desktop layout above, so on mobile
+           the nav scrolled away with the content instead of staying put.
+           Sticky to the top of .content-area (its nearest scrolling
+           ancestor) keeps it visible under the topbar the same way it does
+           on desktop, just as a row instead of a column. Needs its own
+           background since content scrolls underneath it once pinned.
+
+           A plain "top: 0" would leave a sliver the size of .content-area's
+           1.25rem padding uncovered above the stuck nav, letting whatever's
+           behind it show through as stray cut-off text. Pulling the sticky
+           offset up by that same amount (top: -1.25rem) locks it to the
+           true scrollport edge once stuck, but on its own that still leaves
+           the first ~20px of scrolling visibly dragging the nav into place,
+           since its resting position starts 1.25rem lower and has to travel
+           that far before hitting the sticky ceiling. Pairing it with a
+           matching -1.25rem top margin removes that starting offset too, so
+           it's already flush with the true edge at scroll 0 (verified by
+           sampling scrollTop 0 through 200 and seeing zero movement). The
+           negative margin alone does nothing - it only takes effect
+           combined with the offset. width uses calc() because 100% would
+           resolve against the pre-margin containing block, leaving a bare
+           strip down the right edge equal to what the horizontal margins
+           reclaimed (2 x 1.25rem). */
+        position: sticky; top: -1.25rem; z-index: 5; background: var(--bg);
+        flex: 0 0 auto; width: calc(100% + 2.5rem);
+        flex-direction: row; flex-wrap: nowrap;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        gap: 0.3rem;
+        margin: -1.25rem -1.25rem 0.15rem;
+        padding: 0.6rem 1.25rem 0.65rem;
+        border-bottom: 1px solid var(--border);
+    }
+    .docs-nav a { flex: 0 0 auto; white-space: nowrap; }
+    /* Long unbroken command lines are more readable wrapped on a phone than
+       scrolled sideways one line at a time. Desktop/tablet keep the
+       horizontal-scroll behavior above, which preserves exact formatting. */
+    .docs-content pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+}
+@media (max-width: 480px) {
+    /* Stack modal buttons full-width, primary action on top - easier to hit
+       accurately with a thumb than two side-by-side buttons. */
+    .modal-actions { flex-direction: column-reverse; }
+    .modal-actions button { width: 100%; }
+    .pref-toggle-group { width: 100%; }
+    .pref-toggle-btn { flex: 1; }
+}
+
+/* Preferences (theme / motion) toggle buttons on the Account page */
+.pref-toggle-group { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.pref-toggle-btn {
+    background: transparent; color: var(--muted); border: none; border-radius: 0;
+    padding: 0.5rem 1rem; font-size: 0.85rem;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+    /* The rounded clip lives on .pref-toggle-group (overflow:hidden), not
+       this button. Pre-promoting the button's own layer keeps that mask
+       applied consistently instead of flashing square for a frame when the
+       button's transform kicks in on press. */
+    will-change: transform;
+}
+.pref-toggle-btn + .pref-toggle-btn { border-left: 1px solid var(--border); }
+.pref-toggle-btn:hover { background: var(--hover-overlay); }
+.pref-toggle-btn.active { background: var(--accent); color: white; }
+.pref-toggle-btn.active:hover { background: var(--accent-hover); }
+.pref-toggle-btn:active { transform: scale(0.96); }
+
+/* Dashboard traffic charts (Request Types pie + Network Activity bars) */
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.1rem; margin-bottom: 1.25rem; }
+.chart-panel { margin-bottom: 0; }
+.pie-chart-row { display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
+.pie-slice { cursor: pointer; transition: opacity 0.15s ease; animation: fadeIn 0.3s ease backwards; }
+.pie-slice:hover { opacity: 0.75; }
+.chart-legend { display: flex; flex-direction: column; gap: 0.55rem; font-size: 0.85rem; min-width: 120px; }
+.chart-legend-item { display: flex; align-items: center; gap: 0.5rem; }
+.chart-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.chart-legend-count { color: var(--muted); margin-left: auto; padding-left: 0.75rem; }
+.traffic-chart { width: 100%; height: 140px; display: block; }
+.traffic-bar { fill: var(--accent); cursor: pointer; transition: opacity 0.15s ease; animation: fadeIn 0.3s ease backwards; }
+.traffic-bar:hover { opacity: 0.7; }
+.chart-tooltip {
+    display: none; position: fixed; z-index: 200; pointer-events: none;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.5rem 0.75rem; font-size: 0.8rem; line-height: 1.4;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    max-width: 220px;
+}
+
+/* First-run setup wizard: one focused step per screen, sliding transitions,
+   modeled on the "single task, big button, Continue" rhythm of a phone
+   setup flow rather than one long form. */
+/* Equal top/bottom padding on the wizard's own box, independent of
+   .wizard-viewport's height, which JS pins to the active step's content
+   (see wizard.js). So this stays constant as steps change rather than
+   growing/shrinking with them. */
+.wizard { position: relative; padding: 1.5rem 0; }
+.wizard-header { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 1.75rem; }
+.wizard-back {
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    background: none; border: 1px solid var(--border); border-radius: 50%;
+    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); cursor: pointer; padding: 0;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+    will-change: transform;
+}
+.wizard-back svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.wizard-back:hover { background: var(--hover-overlay); color: var(--text); }
+.wizard-back:active { transform: translateY(-50%) scale(0.92); }
+/* The [hidden] attribute normally sets display:none on its own, but the
+   plain class rule above sets display:flex unconditionally, and an
+   author-stylesheet class beats the UA stylesheet's [hidden] rule
+   regardless of specificity. Without restating it here, the back button
+   stayed visible even while wizard.js's `backBtn.hidden = current === 0`
+   correctly toggled the attribute on the first step. */
+.wizard-back[hidden] { display: none; }
+.wizard-dots { display: flex; gap: 0.4rem; }
+.wizard-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background-color 0.25s ease, transform 0.25s ease; }
+.wizard-dot.active { background: var(--accent); transform: scale(1.3); }
+.wizard-dot.done { background: var(--accent); opacity: 0.5; }
+
+/* Height is set inline by wizard.js to match the active step only. The
+   steps sit side by side in .wizard-track, so without this the viewport
+   would stay sized to the tallest step even while a shorter one is shown. */
+.wizard-viewport { overflow: hidden; transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1); }
+.wizard-track { display: flex; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); align-items: flex-start; }
+/* A column flexbox, capped so a step's content can never grow taller than
+   the viewport allows. The 10rem subtracted is headroom for the wizard's
+   own header/padding plus whatever page chrome surrounds it (.topbar-app on
+   a logged-in page, .wrap's padding on the logged-out setup page); min()
+   keeps it from always being that tall on a normal-size window, where every
+   step already fits well under it. Title/subtitle keep their natural size
+   as regular flex children - only .wizard-body (below) is the flexible,
+   scrollable one, so a step that doesn't fit scrolls just its fields+button
+   internally instead of pushing the back button/dots/title/subtitle off
+   screen or growing the page. */
+.wizard-step {
+    flex: 0 0 100%; min-width: 0; padding: 0 2px; box-sizing: border-box;
+    display: flex; flex-direction: column;
+    max-height: min(32rem, calc(100dvh - 10rem));
+}
+
+.wizard-title, .wizard-subtitle { opacity: 0; flex: 0 0 auto; }
+.wizard-step.step-active .wizard-title { animation: fadeInUp 0.4s ease 0.08s both; }
+.wizard-step.step-active .wizard-subtitle { animation: fadeInUp 0.4s ease 0.16s both; }
+.wizard-title { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.6rem; text-align: center; }
+.wizard-subtitle { font-size: 0.9rem; color: var(--muted); text-align: center; line-height: 1.55; margin: 0 0 1.75rem; }
+
+/* Everything below the title/subtitle, the one part of a step allowed to
+   scroll (see .wizard-step above). min-height:0 is required for a flex
+   child to actually shrink below its content size instead of forcing the
+   column taller than the step's max-height. */
+.wizard-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 2px; margin: 0 -2px; }
+
+.wizard-error { display: none; color: var(--err); font-size: 0.82rem; margin: -0.3rem 0 1rem; text-align: center; }
+
+.wizard-continue {
+    width: 100%; padding: 0.85rem 1.2rem; font-size: 1rem; font-weight: 600;
+    border-radius: 10px; margin-top: 0.5rem;
+}
+
+.provider-link {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600;
+    margin-bottom: 1.1rem; transition: color 0.15s ease;
+}
+.provider-link:hover { color: var(--accent-hover); }

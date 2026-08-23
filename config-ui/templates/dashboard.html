@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Foundry Admin{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content_class %}wide{% endblock %}
+{% block content %}
+
+<div class="live-indicator">
+    <span class="dot running"></span>
+    <span id="live-status">Loading metrics&hellip;</span>
+</div>
+
+<div class="metrics-grid">
+
+    <div class="metric-card">
+        <div class="metric-top">
+            <div class="metric-label">Foundry</div>
+            <div class="metric-icon blue">
+                <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5"/><circle cx="8" cy="7.5" r="0.6" fill="currentColor"/><circle cx="8" cy="16.5" r="0.6" fill="currentColor"/></svg>
+            </div>
+        </div>
+        <div class="metric-value"><span class="dot loading" data-dot="foundry"></span><span data-metric="foundry-status"><span class="skeleton">&nbsp;</span></span></div>
+        <div class="metric-sub" data-metric="foundry-sub"><span class="skeleton" style="width:110px;">&nbsp;</span></div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-top">
+            <div class="metric-label">Public Tunnel</div>
+            <div class="metric-icon teal">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>
+            </div>
+        </div>
+        <div class="metric-value"><span class="dot loading" data-dot="tunnel"></span><span data-metric="tunnel-status"><span class="skeleton">&nbsp;</span></span></div>
+        <div class="metric-sub" data-metric="tunnel-sub"><span class="skeleton" style="width:140px;">&nbsp;</span></div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-top">
+            <div class="metric-label">CPU Usage</div>
+            <div class="metric-icon orange">
+                <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+            </div>
+        </div>
+        <div class="metric-value" data-metric="cpu-value"><span class="skeleton" style="width:60px;">&nbsp;</span></div>
+        <div class="metric-sub">Foundry container</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-top">
+            <div class="metric-label">Memory</div>
+            <div class="metric-icon green">
+                <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 7v10M11 7v10M15 7v10"/></svg>
+            </div>
+        </div>
+        <div class="metric-value" data-metric="mem-value"><span class="skeleton" style="width:80px;">&nbsp;</span></div>
+        <div class="metric-sub" data-metric="mem-sub"><span class="skeleton" style="width:130px;">&nbsp;</span></div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-top">
+            <div class="metric-label">Requests Served</div>
+            <div class="metric-icon red">
+                <svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+            </div>
+        </div>
+        <div class="metric-value" data-metric="requests-value"><span class="skeleton" style="width:50px;">&nbsp;</span></div>
+        <div class="metric-sub" data-metric="requests-sub"><span class="skeleton" style="width:120px;">&nbsp;</span></div>
+    </div>
+
+</div>
+
+<div class="charts-grid">
+    <div class="panel chart-panel">
+        <h2 class="section-title">Request Types</h2>
+        <p class="help" style="margin-top:0;">Last 4 hours, across both Foundry and admin traffic. Hover a slice for the exact count.</p>
+        <div class="pie-chart-row">
+            <svg id="request-types-pie" viewBox="0 0 140 140" width="140" height="140"></svg>
+            <div class="chart-legend" id="request-types-legend"></div>
+        </div>
+        <p class="help" id="request-types-empty" style="display:none;">No requests recorded yet in this window.</p>
+    </div>
+
+    <div class="panel chart-panel">
+        <h2 class="section-title">Network Activity</h2>
+        <p class="help" style="margin-top:0;">Requests per 15 minutes, last 4 hours. Hover a bar for the exact count.</p>
+        <svg id="traffic-timeseries" viewBox="0 0 640 140" preserveAspectRatio="none" class="traffic-chart"></svg>
+    </div>
+</div>
+
+<div id="chart-tooltip" class="chart-tooltip"></div>
+
+<div class="panel">
+    <h2 class="section-title">About these numbers</h2>
+    <p class="help" style="margin:0;">
+        Foundry's CPU/memory come live from <code>docker stats</code>. "Requests Served" is nginx's own
+        <code>stub_status</code> counter, totaled across both the public Foundry traffic and this admin
+        site since nginx last restarted. The charts above are built from nginx's own request log instead
+        (method and volume over time), kept only for the trailing 4 hours - older entries are discarded,
+        never written anywhere permanent. See <a href="{{ url_for('docs_page', slug='architecture') }}">Architecture</a>
+        for how all of this is gathered. Nothing here is simulated - this page re-fetches them in the background.
+    </p>
+</div>
+
+<script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/traffic-charts.js') }}" defer></script>
+
+{% endblock %}

@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Account & Recovery - Foundry Admin{% endblock %}
+{% block page_title %}Account &amp; Recovery{% endblock %}
+{% block content %}
+
+<div class="docs-layout">
+    <nav class="docs-nav" id="account-nav">
+        <a href="#preferences" class="active" data-tab="preferences">Preferences</a>
+        <a href="#password-reset" data-tab="password-reset">Password Reset</a>
+        <a href="#password-recovery" data-tab="password-recovery">Password Recovery</a>
+    </nav>
+
+    <div class="docs-content">
+
+        <section class="account-panel" data-panel="preferences">
+            <h1>Preferences</h1>
+            <!-- <p class="help" style="margin-top:0;">Saved to this browser - each device you use remembers its own choice.</p> -->
+
+            <div class="field">
+                <label>Theme</label>
+                <div class="pref-toggle-group" id="theme-toggle-group">
+                    <button type="button" class="pref-toggle-btn" data-theme-value="dark">Dark</button>
+                    <button type="button" class="pref-toggle-btn" data-theme-value="light">Light</button>
+                </div>
+            </div>
+
+            <div class="field" style="margin-bottom:0;">
+                <label>Motion</label>
+                <div class="pref-toggle-group" id="motion-toggle-group">
+                    <button type="button" class="pref-toggle-btn" data-motion-value="on">Animations on</button>
+                    <button type="button" class="pref-toggle-btn" data-motion-value="off">Reduce motion</button>
+                </div>
+            </div>
+        </section>
+
+        {# Changing your own password right now, separate from the recovery
+           wizard below (which is about the forgot-password email flow).
+           Different concerns, so a plain single-step form instead of a
+           wizard. #}
+        <section class="account-panel" data-panel="password-reset" hidden>
+            <h1>Password Reset</h1>
+            <p class="help" style="margin-top:0;">Change the password you sign in with. Leave both fields blank to keep your current one.</p>
+            <form method="post" action="{{ url_for('save_account') }}" id="password-reset-form">
+                <div class="field">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="leave blank to keep current" autocomplete="new-password">
+                    <div class="help">At least 8 characters if changing it.</div>
+                </div>
+                <div class="field">
+                    <label for="confirm_new_password">Confirm New Password</label>
+                    <input type="password" id="confirm_new_password" name="confirm_new_password" autocomplete="new-password">
+                </div>
+                <div class="help" data-reset-error style="display:none; color:var(--err); margin-bottom:0.75rem;"></div>
+                <button type="submit" disabled>Save Password</button>
+            </form>
+        </section>
+
+        <section class="account-panel" data-panel="password-recovery" hidden>
+            <div class="wizard" id="password-recovery-wizard">
+                <div class="wizard-header">
+                    <button type="button" class="wizard-back" aria-label="Back" hidden>
+                        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+                    </button>
+                    <div class="wizard-dots">
+                        <span class="wizard-dot"></span>
+                        <span class="wizard-dot"></span>
+                        <span class="wizard-dot"></span>
+                    </div>
+                </div>
+
+                <div class="wizard-viewport">
+                    <form method="post" action="{{ url_for('save_account') }}" autocomplete="off">
+                        <div class="wizard-track">
+
+                            <section class="wizard-step">
+                                <h1 class="wizard-title">Recovery email</h1>
+                                <p class="wizard-subtitle">
+                                    Where we'll send a reset code if you ever get locked out. Use an
+                                    email you can actually check - not the sending account, next.
+                                </p>
+                                <div class="wizard-body">
+                                    <div class="field">
+                                        <label for="ADMIN_UI_RECOVERY_EMAIL">Your Email Address</label>
+                                        <input type="email" id="ADMIN_UI_RECOVERY_EMAIL" name="ADMIN_UI_RECOVERY_EMAIL"
+                                               value="{{ env_values.get('ADMIN_UI_RECOVERY_EMAIL', '') }}" autocomplete="email">
+                                    </div>
+                                    <div class="wizard-error" data-step-error></div>
+                                    <button type="button" class="wizard-continue" data-next>Continue</button>
+                                </div>
+                            </section>
+
+                            <section class="wizard-step">
+                                <h1 class="wizard-title">Email provider</h1>
+                                <p class="wizard-subtitle">
+                                    Pick the provider you send from. We'll fill in the technical
+                                    settings and link straight to where to get an app password.
+                                </p>
+                                <div class="wizard-body">
+                                    <div class="field">
+                                        <label for="email-provider">Email Provider</label>
+                                        <select id="email-provider">
+                                            <option value="gmail">Gmail</option>
+                                            <option value="outlook">Outlook / Hotmail / Live</option>
+                                            <option value="yahoo">Yahoo Mail</option>
+                                            <option value="icloud">iCloud Mail</option>
+                                            <option value="other">Other / not listed</option>
+                                        </select>
+                                        <div class="help" id="provider-instructions"></div>
+                                    </div>
+                                    <div class="wizard-error" data-step-error></div>
+                                    <button type="button" class="wizard-continue" data-next>Continue</button>
+                                </div>
+                            </section>
+
+                            <section class="wizard-step">
+                                <h1 class="wizard-title">Sending email</h1>
+                                <p class="wizard-subtitle">
+                                    Needs a provider-specific "app password," not your regular email
+                                    login - see
+                                    <a href="{{ url_for('docs_page', slug='admin-ui') }}#setting-up-the-sending-email-account">Setting up the sending email account</a>
+                                    for step-by-step instructions.
+                                </p>
+
+                                <div class="wizard-body">
+                                    <a href="#" id="provider-link" class="provider-link" target="_blank" rel="noopener">
+                                        Get your app password
+                                        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2"><path d="M7 17 17 7M8 7h9v9"/></svg>
+                                    </a>
+
+                                    <div class="field">
+                                        <label for="SMTP_USERNAME">Sending Email Address</label>
+                                        <input type="email" id="SMTP_USERNAME" name="SMTP_USERNAME"
+                                               value="{{ env_values.get('SMTP_USERNAME', '') }}" autocomplete="email">
+                                    </div>
+                                    <div class="field">
+                                        <label for="SMTP_PASSWORD">Email App Password</label>
+                                        <input type="password" id="SMTP_PASSWORD" name="SMTP_PASSWORD"
+                                               placeholder="{{ '•' * 12 if env_values.get('SMTP_PASSWORD') else '' }} (leave blank to keep current)"
+                                               autocomplete="new-password">
+                                    </div>
+
+                                    {# Auto-filled from the provider picked above and hidden for any
+                                       known provider. bindEmailProviderPicker (see
+                                       email-providers.js) only shows these, and marks them required,
+                                       when "Other / not listed" is selected. #}
+                                    <div class="field">
+                                        <label for="SMTP_HOST">Email Server</label>
+                                        <input type="text" id="SMTP_HOST" name="SMTP_HOST"
+                                               value="{{ env_values.get('SMTP_HOST') or field_defaults.get('SMTP_HOST', '') }}">
+                                    </div>
+                                    <div class="field">
+                                        <label for="SMTP_PORT">Email Server Port</label>
+                                        <input type="text" id="SMTP_PORT" name="SMTP_PORT"
+                                               value="{{ env_values.get('SMTP_PORT') or field_defaults.get('SMTP_PORT', '') }}">
+                                    </div>
+
+                                    <div class="wizard-error" data-step-error></div>
+                                    <button type="submit" class="wizard-continue">Save Recovery Settings</button>
+                                </div>
+                            </section>
+
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/email-providers.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/custom-select.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/wizard.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/preferences.js') }}" defer></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Tab navigation, styled and behaving like the Docs nav (including
+        // its mobile scrollable-strip layout) - client-side only, since all
+        // panels already live on this one page. Switches with a fade
+        // out-then-in on the content, matching how page-to-page navigation
+        // transitions elsewhere (see the view-transition rules in
+        // style.css) - a hard cut here would feel inconsistent by contrast.
+        var nav = document.getElementById("account-nav");
+        var tabs = Array.prototype.slice.call(nav.querySelectorAll("[data-tab]"));
+        var panels = Array.prototype.slice.call(document.querySelectorAll(".account-panel"));
+        var FADE_MS = document.documentElement.classList.contains("reduce-motion") ? 0 : 160;
+
+        var scrollEl = document.querySelector(".content-area");
+
+        function showTab(name) {
+            if (!tabs.some(function (t) { return t.dataset.tab === name; })) name = "preferences";
+            tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.tab === name); });
+
+            var current = panels.filter(function (p) { return !p.hidden; })[0];
+            var next = panels.filter(function (p) { return p.dataset.panel === name; })[0];
+            if (!next || current === next) return;
+
+            // A tab can be switched while scrolled partway down the current
+            // panel (e.g. the Password Recovery wizard's later steps) -
+            // land back at the top of the new one instead of wherever that
+            // scroll position happened to leave the page.
+            scrollEl.scrollTop = 0;
+
+            if (!current || !FADE_MS) {
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+                return;
+            }
+
+            current.style.opacity = "0";
+            setTimeout(function () {
+                current.hidden = true;
+                next.hidden = false;
+                next.style.opacity = "0";
+                requestAnimationFrame(function () { next.style.opacity = "1"; });
+            }, FADE_MS);
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener("click", function (evt) {
+                evt.preventDefault();
+                showTab(tab.dataset.tab);
+                history.replaceState(null, "", "#" + tab.dataset.tab);
+                tab.scrollIntoView({ block: "nearest", inline: "center" });
+            });
+        });
+
+        showTab((location.hash || "").slice(1));
+
+        // Password Reset - the button starts disabled (see the template) so
+        // an empty/accidental submit can't silently POST this form and post
+        // a "saved" message for a password that never actually changed;
+        // it's only enabled once both fields are filled and satisfy the
+        // same rules the server enforces. Submit-time validation is kept
+        // too, as a fallback for anything that reaches the server anyway
+        // (bypassed JS, browser autofill triggering a submit before the
+        // input events below have run).
+        var resetForm = document.getElementById("password-reset-form");
+        if (resetForm) {
+            var newPasswordInput = document.getElementById("new_password");
+            var confirmPasswordInput = document.getElementById("confirm_new_password");
+            var savePasswordBtn = resetForm.querySelector("button[type=submit]");
+
+            function passwordResetError() {
+                var newPassword = newPasswordInput.value;
+                var confirmPassword = confirmPasswordInput.value;
+                if (!newPassword && !confirmPassword) return "empty";
+                if (newPassword.length < 8) return "New password must be at least 8 characters.";
+                if (newPassword !== confirmPassword) return "New passwords don't match.";
+                return null;
+            }
+
+            function updateSaveButtonState() {
+                savePasswordBtn.disabled = passwordResetError() !== null;
+            }
+            [newPasswordInput, confirmPasswordInput].forEach(function (el) {
+                el.addEventListener("input", updateSaveButtonState);
+            });
+            updateSaveButtonState();
+
+            resetForm.addEventListener("submit", function (evt) {
+                var error = passwordResetError();
+                var errEl = resetForm.querySelector("[data-reset-error]");
+                errEl.textContent = error === "empty" ? "" : (error || "");
+                errEl.style.display = error && error !== "empty" ? "block" : "none";
+                if (error) evt.preventDefault();
+            });
+        }
+
+        // Email provider picker + pre-select it to match what's already
+        // saved, so editing reflects the real current setup instead of
+        // always defaulting to Gmail.
+        var hostInput = document.getElementById("SMTP_HOST");
+        var portInput = document.getElementById("SMTP_PORT");
+        var selectEl = document.getElementById("email-provider");
+
+        // These already carry the saved value rendered from the server -
+        // mark them "user edited" up front so the picker's auto-fill
+        // (meant for when someone actively switches providers) doesn't
+        // clobber a custom host/port on page load.
+        if (hostInput && hostInput.value) hostInput.dataset.userEdited = "1";
+        if (portInput && portInput.value) portInput.dataset.userEdited = "1";
+
+        var currentHost = hostInput ? hostInput.value.trim().toLowerCase() : "";
+        var matchedProvider = "other";
+        for (var key in EMAIL_PROVIDERS) {
+            if (key !== "other" && EMAIL_PROVIDERS[key].host && EMAIL_PROVIDERS[key].host.toLowerCase() === currentHost) {
+                matchedProvider = key;
+                break;
+            }
+        }
+        if (selectEl) selectEl.value = currentHost ? matchedProvider : "gmail";
+
+        bindEmailProviderPicker(selectEl, hostInput, portInput,
+            document.getElementById("provider-instructions"),
+            document.getElementById("provider-link")
+        );
+
+        // Password Recovery wizard - one focused field per screen like the
+        // first-run setup wizard, all still one real <form> that only
+        // posts once, at the end (see save_account in app.py).
+        function validateStep(index) {
+            if (index === 0) {
+                var email = document.getElementById("ADMIN_UI_RECOVERY_EMAIL").value.trim();
+                if (email && email.indexOf("@") === -1) return "Enter a valid email address.";
+                return null;
+            }
+            if (index === 2) {
+                var sendAddr = document.getElementById("SMTP_USERNAME").value.trim();
+                if (sendAddr && sendAddr.indexOf("@") === -1) return "Enter a valid sending email address.";
+                if (hostInput && hostInput.required && !hostInput.value.trim()) return "Enter your email provider's SMTP server address.";
+                if (portInput && portInput.required && !portInput.value.trim()) return "Enter your email provider's SMTP port.";
+                return null;
+            }
+            return null;
+        }
+
+        initWizard(document.getElementById("password-recovery-wizard"), validateStep);
+    });
+</script>
+{% endblock %}

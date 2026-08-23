@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Foundry Settings - Foundry Admin{% endblock %}
+{% block page_title %}Foundry Settings{% endblock %}
+{% block content %}
+
+<div class="settings-wizard-wrap">
+    <div class="wizard" id="settings-wizard">
+        <div class="wizard-header">
+            <button type="button" class="wizard-back" aria-label="Back" hidden>
+                <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <div class="wizard-dots">
+                {% for step_title, step_subtitle, fields in steps %}
+                <span class="wizard-dot"></span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="wizard-viewport">
+            <form method="post" action="{{ url_for('save') }}" id="foundry-form">
+                <div class="wizard-track">
+                    {% for step_title, step_subtitle, fields in steps %}
+                    <section class="wizard-step">
+                        <h1 class="wizard-title">{{ step_title }}</h1>
+                        <p class="wizard-subtitle">{{ step_subtitle }}</p>
+
+                        <div class="wizard-body">
+                            {% if loop.last %}
+                            <a href="{{ url_for('docs_page', slug='cloudflare-tunnel-setup') }}" class="provider-link" target="_blank" rel="noopener">
+                                Cloudflare Tunnel Setup guide
+                                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2"><path d="M7 17 17 7M8 7h9v9"/></svg>
+                            </a>
+                            {% endif %}
+
+                            {% for key, label, input_type, help_text in fields %}
+                            {% set still_required = key in required_fields and not env_values.get(key) %}
+                            <div class="field">
+                                <label for="{{ key }}">{{ label }}{% if still_required %} <span class="field-required" title="Required">*</span>{% endif %}</label>
+                                <input
+                                    type="{{ input_type }}"
+                                    id="{{ key }}"
+                                    name="{{ key }}"
+                                    data-label="{{ label }}"
+                                    {% if input_type == "password" %}
+                                        placeholder="{{ '•' * 12 if env_values.get(key) else '' }} (leave blank to keep current)"
+                                        data-has-current="{{ '1' if env_values.get(key) else '' }}"
+                                    {% else %}
+                                        data-original="{{ env_values.get(key, '') }}"
+                                        value="{{ env_values.get(key, '') }}"
+                                    {% endif %}
+                                >
+                                {% if help_text %}<div class="help">{{ help_text }}</div>{% endif %}
+                            </div>
+                            {% endfor %}
+
+                            <div class="wizard-error" data-step-error></div>
+                            {% if loop.last %}
+                            <button type="submit" class="wizard-continue">Save &amp; Restart</button>
+                            {% else %}
+                            <button type="button" class="wizard-continue" data-next>Continue</button>
+                            {% endif %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="restart-modal">
+    <div class="modal">
+        <h2>Restart with these changes?</h2>
+        <p class="help">
+            Foundry always restarts on save; the Cloudflare Tunnel also restarts if you
+            changed the tunnel token or domain. Players are briefly unreachable during
+            each restart - the admin area stays up the whole time.
+        </p>
+        <ul class="change-list" id="restart-change-list"></ul>
+        <div class="modal-actions">
+            <button type="button" class="secondary" id="restart-cancel">Cancel</button>
+            <button type="button" id="restart-confirm">Confirm &amp; Restart</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/wizard.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/settings.js') }}" defer></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Mirrors the required-field checks save() runs server-side (see
+        // app.py), so a missing Admin Key or a half-filled foundryvtt.com
+        // login gets caught on the step it's on instead of only after
+        // Save & Restart round-trips to the server and back.
+        function hasValue(input) {
+            if (!input) return false;
+            if (input.type === "password") return !!input.value || !!input.dataset.hasCurrent;
+            return !!input.value.trim();
+        }
+
+        function validateStep(index) {
+            var step = document.querySelectorAll(".wizard-step")[index];
+
+            var adminKey = step.querySelector("#FOUNDRY_ADMIN_KEY");
+            if (adminKey && !hasValue(adminKey)) {
+                return "Set an Admin Key before continuing - Foundry's /setup screens are unprotected without one.";
+            }
+
+            var username = step.querySelector("#FOUNDRY_USERNAME");
+            var password = step.querySelector("#FOUNDRY_PASSWORD");
+            if (username && password && hasValue(username) !== hasValue(password)) {
+                return "Enter both your foundryvtt.com username and password, or leave both blank to use FOUNDRY_RELEASE_URL instead.";
+            }
+
+            return null;
+        }
+
+        initWizard(document.getElementById("settings-wizard"), validateStep);
+    });
+</script>
+{% endblock %}

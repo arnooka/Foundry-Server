@@ -1,0 +1,100 @@
+# Pinned so container and network names stay stable whether compose is run
+# from the host (repo root) or from inside the config-ui container (/workspace).
+name: foundry-server
+
+services:
+  foundry:
+    # FOUNDRY_CONTAINER_TAG pins the image itself, separate from FOUNDRY_VERSION
+    # (set via env_file below), which tells the entrypoint which Foundry release
+    # to download. Passing an alias like "release" as FOUNDRY_VERSION too makes
+    # the entrypoint log a version-mismatch warning, since it wants a concrete
+    # version number there.
+    image: ghcr.io/felddy/foundryvtt:${FOUNDRY_CONTAINER_TAG:-release}
+    hostname: ${FOUNDRY_HOSTNAME:-foundry}
+    restart: unless-stopped
+    volumes:
+      # Named volume rather than a bind mount, so it resolves the same way
+      # whether the host shell or config-ui's own `docker compose` (over the
+      # socket) issues the command. No host path to configure.
+      - foundry-data:/data
+    # Raw KEY=VALUE pairs, not run through Compose's ${...} interpolation, since
+    # an admin key or password containing a literal "$" would otherwise get
+    # silently mangled. required: false so the stack still boots with no .env
+    # present; see docs/admin-ui-guide.md for the first-run setup wizard.
+    env_file:
+      - path: .env
+        required: false
+    networks:
+      - foundry-net
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - foundry
+      - config-ui
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # Structured per-request JSON log (see nginx/conf.d/_logging.conf), shared
+      # with config-ui for the dashboard's traffic charts. Kept separate from
+      # nginx's default log directory so `docker logs nginx` still works normally.
+      - nginx-logs:/var/log/app-traffic
+    ports:
+      - "80:80" # Foundry traffic; this is the port the Cloudflare Tunnel points to
+      - "8080:8080" # Admin UI, LAN only. Never make this a tunnel destination.
+    networks:
+      - foundry-net
+
+  config-ui:
+    build: ./config-ui
+    restart: unless-stopped
+    # Raw KEY=VALUE pairs again, since ADMIN_UI_PASSWORD_HASH contains literal
+    # "$" characters (werkzeug hash format) that Compose interpolation would
+    # mangle. required: false so this container and its first-run setup wizard
+    # come up even before .env exists.
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      # Whole project mounted read-write: config-ui needs docker-compose.yml and
+      # .env to edit config and drive `docker compose` for the foundry service.
+      # docker_control.py uses absolute paths for all `docker compose` calls, so
+      # the container's working directory can stay at the Dockerfile's WORKDIR
+      # (/app) for `python app.py`.
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Read-write: config-ui tails new lines into its own in-memory 4-hour
+      # window (see docker_control.get_traffic_stats) and periodically truncates
+      # the file so it doesn't grow unbounded. The file is just a transient
+      # handoff, not the retained history.
+      - nginx-logs:/var/log/app-traffic
+    networks:
+      - foundry-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    # cloudflared reads its token from TUNNEL_TOKEN specifically, mapped here
+    # from CLOUDFLARE_TUNNEL_TOKEN in .env to match this project's naming.
+    # Tunnel tokens are base64 (no "$"), so Compose interpolation is safe here;
+    # see the escaping note in .env.example. The public hostname -> nginx:80
+    # mapping lives in the Cloudflare Zero Trust dashboard, not here; see
+    # docs/cloudflare-tunnel-setup.md.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: ["tunnel", "--no-autoupdate", "run"]
+    networks:
+      - foundry-net
+
+networks:
+  foundry-net:
+    driver: bridge
+
+volumes:
+  foundry-data:
+  nginx-logs:

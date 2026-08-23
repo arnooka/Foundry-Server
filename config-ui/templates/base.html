@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Foundry Admin{% endblock %}</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-light-32.png') }}" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-dark-32.png') }}" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon-light.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/favicon-light-512.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        // Applies remembered display preferences (theme, motion, and - once
+        // logged in - sidebar state) before first paint, so nothing flashes
+        // to its default and then snaps/animates to the saved one on every
+        // page load. Deliberately inline+sync (not in static/js) for that
+        // reason. The controls that maintain these live in
+        // static/js/preferences.js (theme/motion, on the Account page) and
+        // static/js/sidebar.js (sidebar, in the nav).
+        (function () {
+            try {
+                if (localStorage.getItem("theme") === "light") {
+                    document.documentElement.classList.add("theme-light");
+                }
+                if (localStorage.getItem("reduceMotion") === "1") {
+                    document.documentElement.classList.add("reduce-motion");
+                }
+                if (localStorage.getItem("sidebarCollapsed") === "1") {
+                    document.documentElement.classList.add("sidebar-collapsed");
+                }
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body>
+{% if session.get('logged_in') %}
+    <div class="app-shell">
+        <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-checkbox">
+        <label for="sidebar-toggle" class="sidebar-backdrop" aria-hidden="true"></label>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    {# Two images, swapped by the app's own theme class, not
+                       prefers-color-scheme. The sidebar's background follows
+                       the in-app dark/light toggle on the Account page, not
+                       the OS setting, so the logo has to follow the same
+                       signal or the wrong-contrast variant can end up on the
+                       wrong panel. #}
+                    <img class="brand-logo brand-logo-dark" src="{{ url_for('static', filename='img/logo-dark-transparent.png') }}" alt="Foundry Admin">
+                    <img class="brand-logo brand-logo-light" src="{{ url_for('static', filename='img/logo-light-transparent.png') }}" alt="Foundry Admin">
+                </div>
+                <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-toggle" title="Collapse sidebar" aria-label="Collapse sidebar">
+                    <svg class="toggle-icon" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+                </button>
+                <label for="sidebar-toggle" class="sidebar-close-btn" aria-label="Close menu">
+                    <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </label>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-label">Overview</div>
+                <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="{{ url_for('dashboard') }}" title="Dashboard">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-label">Configuration</div>
+                <a class="nav-link {{ 'active' if request.endpoint == 'settings' }}" href="{{ url_for('settings') }}" title="Foundry Settings">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+                    <span class="nav-text">Foundry Settings</span>
+                </a>
+                <a class="nav-link {{ 'active' if request.endpoint == 'account' }}" href="{{ url_for('account') }}" title="Account &amp; Recovery">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+                    <span class="nav-text">Account &amp; Recovery</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-label">Help</div>
+                <a class="nav-link {{ 'active' if request.endpoint in ('docs_index', 'docs_page') }}" href="{{ url_for('docs_index') }}" title="Docs">
+                    <svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5v-17Z"/><path d="M4 19a2.5 2.5 0 0 1 2.5-2.5H20"/></svg>
+                    <span class="nav-text">Docs</span>
+                </a>
+            </div>
+
+            <div class="sidebar-footer">
+                <a class="nav-link" href="{{ url_for('logout') }}" title="Sign out">
+                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                    <span class="nav-text">Sign out</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="main-area">
+            <div class="topbar-app">
+                <label for="sidebar-toggle" class="hamburger">&#9776;</label>
+                <h1 id="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                <div></div>
+            </div>
+            <div class="content-area {% block content_class %}{% endblock %}">
+                {% for category, message in get_flashed_messages(with_categories=true) %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}" defer></script>
+{% else %}
+    <div class="wrap {% block wrap_class %}{% endblock %}">
+        <div class="logged-out-brand">
+            <img class="brand-logo-lg brand-logo-dark" src="{{ url_for('static', filename='img/logo-dark-transparent.png') }}" alt="Foundry Admin">
+            <img class="brand-logo-lg brand-logo-light" src="{{ url_for('static', filename='img/logo-light-transparent.png') }}" alt="Foundry Admin">
+        </div>
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% block content_logged_out %}{{ self.content() }}{% endblock %}
+    </div>
+{% endif %}
+</body>
+</html>
