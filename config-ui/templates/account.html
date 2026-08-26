@@ -41,6 +41,7 @@
             <h1>Password Reset</h1>
             <p class="help" style="margin-top:0;">Change the password you sign in with. Leave both fields blank to keep your current one.</p>
             <form method="post" action="{{ url_for('save_account') }}" id="password-reset-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="field">
                     <label for="new_password">New Password</label>
                     <input type="password" id="new_password" name="new_password" placeholder="leave blank to keep current" autocomplete="new-password">
@@ -70,6 +71,7 @@
 
                 <div class="wizard-viewport">
                     <form method="post" action="{{ url_for('save_account') }}" autocomplete="off">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="wizard-track">
 
                             <section class="wizard-step">

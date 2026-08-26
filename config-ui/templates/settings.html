@@ -18,6 +18,7 @@
 
         <div class="wizard-viewport">
             <form method="post" action="{{ url_for('save') }}" id="foundry-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="wizard-track">
                     {% for step_title, step_subtitle, fields in steps %}
                     <section class="wizard-step">

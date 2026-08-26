@@ -39,13 +39,17 @@ and proxies to `config-ui:5000`. No WebSocket handling or special timeouts
 needed; it's a plain admin form.
 
 Splitting these into two vhosts/ports, rather than one nginx server routing
-by path (e.g. `/admin`), enforces the separation structurally: **only port 80
-is ever configured as a Cloudflare Tunnel destination.** Port 8080 has no
-code path that reaches the public internet. It's not a permissions check
-that could have a bug in it; it's a tunnel that was simply never told that
-port exists. See [Admin UI Guide](admin-ui-guide.md) for what this means for
-you day to day, and don't forward port 8080 through your router. Keep it
-LAN-only.
+by path (e.g. `/admin`), enforces the separation structurally: by default,
+**only port 80 is configured as a Cloudflare Tunnel destination.** Port 8080
+has no code path that reaches the public internet unless you deliberately
+add one. See [Admin UI Guide](admin-ui-guide.md) for what this means for you
+day to day, and don't forward port 8080 through your router - keep it
+LAN-only, or if you do want to reach it remotely, route it through the
+Cloudflare Tunnel as its own hostname rather than opening it on your router;
+see [Cloudflare Tunnel Setup: exposing the admin UI](cloudflare-tunnel-setup.md#exposing-the-admin-ui)
+for what to lock down first (Cloudflare Access in particular - `config-ui`
+holds the Docker socket, so its own login form shouldn't be the only thing
+between the internet and this host).
 
 ## Why `config-ui` needs the Docker socket
 

@@ -353,9 +353,11 @@ _reset_state = {"code": None, "expires_at": 0.0, "attempts": 0, "last_sent_at": 
 
 def reset_send_cooldown_remaining() -> int:
     """Seconds until another code can be requested. Anyone who can reach
-    /forgot-password (LAN only, see architecture.md) could otherwise mash
-    "send code" repeatedly and spam the recovery inbox or probe the
-    endpoint. Returns 0 if a new send is allowed right now."""
+    /forgot-password - which now includes the public internet, if an admin
+    subdomain is routed through the Cloudflare Tunnel, see
+    docs/cloudflare-tunnel-setup.md - could otherwise mash "send code"
+    repeatedly and spam the recovery inbox or probe the endpoint. Returns 0
+    if a new send is allowed right now."""
     remaining = _reset_state["last_sent_at"] + _RESET_SEND_COOLDOWN_SECONDS - time.time()
     return max(0, int(remaining))
 
@@ -387,6 +389,38 @@ def verify_reset(submitted_code: str) -> bool:
 
 def clear_reset() -> None:
     _reset_state.update(code=None, expires_at=0.0, attempts=0)
+
+
+# --- Login throttling ---------------------------------------------------
+
+_LOGIN_MAX_ATTEMPTS = 5
+_LOGIN_LOCKOUT_SECONDS = 15 * 60
+
+# In-memory only, same reasoning as _reset_state above (single Flask
+# process, resets on restart - acceptable since this only needs to survive
+# one bad actor's session, not forever). Keyed by client IP so one bad actor
+# doesn't lock out anyone else, e.g. players on the same vhost's tunnel path.
+_login_attempts: dict[str, list[float]] = {}
+
+
+def login_lockout_remaining(ip: str) -> int:
+    """Seconds until `ip` may attempt another login. This is what stands
+    between the login form and a brute-force script now that the admin UI
+    can be reached from the internet."""
+    now = time.time()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_LOCKOUT_SECONDS]
+    _login_attempts[ip] = attempts
+    if len(attempts) < _LOGIN_MAX_ATTEMPTS:
+        return 0
+    return max(0, int(attempts[0] + _LOGIN_LOCKOUT_SECONDS - now))
+
+
+def record_failed_login(ip: str) -> None:
+    _login_attempts.setdefault(ip, []).append(time.time())
+
+
+def clear_login_attempts(ip: str) -> None:
+    _login_attempts.pop(ip, None)
 
 
 def recovery_is_configured() -> bool:

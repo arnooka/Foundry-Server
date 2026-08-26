@@ -41,7 +41,12 @@ services:
       - nginx-logs:/var/log/app-traffic
     ports:
       - "80:80" # Foundry traffic; this is the port the Cloudflare Tunnel points to
-      - "8080:8080" # Admin UI, LAN only. Never make this a tunnel destination.
+      - "8080:8080" # Admin UI: LAN access, and optionally an admin subdomain
+      # routed through the same Cloudflare Tunnel (see
+      # docs/cloudflare-tunnel-setup.md#exposing-the-admin-ui). If you do
+      # that, put a Cloudflare Access policy in front of that hostname -
+      # this container holds the Docker socket, so its login form should
+      # never be the only thing between the internet and this host.
     networks:
       - foundry-net
 

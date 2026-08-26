@@ -1,6 +1,8 @@
+import secrets
+from datetime import timedelta
 from functools import wraps
 
-from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from services import docker_control as dc
@@ -9,6 +11,23 @@ from services import traffic
 
 app = Flask(__name__)
 app.secret_key = dc.get_or_create_secret_key()
+# Now that the admin UI can be reached from the internet (an admin subdomain
+# routed through the Cloudflare Tunnel, see docs/cloudflare-tunnel-setup.md),
+# sessions get a server-enforced expiry and SameSite=Lax, which stops the
+# cookie being sent on cross-site form submits/navigations - the first line
+# of defense against CSRF, backed up by the token check below.
+app.config.update(
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+)
+
+
+def client_ip() -> str:
+    """The visitor's real IP. Cloudflare's edge sets Cf-Connecting-Ip and
+    cloudflared forwards it unmodified; nginx never sees or rewrites it, so
+    it's read straight from the request. Falls back to the direct peer
+    address for LAN access, where the header is never present."""
+    return request.headers.get("Cf-Connecting-Ip", request.remote_addr)
 
 
 def login_required(view):
@@ -31,6 +50,27 @@ def require_setup_first():
         return
     if not dc.is_account_configured():
         return redirect(url_for("setup"))
+
+
+@app.before_request
+def enforce_csrf():
+    """Every POST must carry back the token the form was rendered with (see
+    inject_csrf_token below). Without this, any site the admin's browser
+    visits could silently submit a forged request to e.g. /save-account
+    using their live session cookie - a real risk once this app is reachable
+    from the open internet rather than just the LAN."""
+    if request.method == "POST":
+        token = session.get("csrf_token")
+        submitted = request.form.get("csrf_token", "")
+        if not token or not secrets.compare_digest(token, submitted):
+            abort(400, description="Missing or invalid CSRF token. Go back and reload the page, then try again.")
+
+
+@app.context_processor
+def inject_csrf_token():
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+    return {"csrf_token": session["csrf_token"]}
 
 
 @app.route("/setup", methods=["GET", "POST"])
@@ -66,6 +106,7 @@ def setup():
             dc.create_account(username, password)
             dc.write_env(account_updates)
             session["logged_in"] = True
+            session.permanent = True
             flash("Account created.", "success")
             return redirect(url_for("dashboard"))
 
@@ -80,13 +121,22 @@ def setup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("username", "")
-        password = request.form.get("password", "")
-        env = dc.read_env()
-        if username == env.get("ADMIN_UI_USERNAME") and check_password_hash(env.get("ADMIN_UI_PASSWORD_HASH", ""), password):
-            session["logged_in"] = True
-            return redirect(url_for("dashboard"))
-        flash("Invalid username or password.", "error")
+        ip = client_ip()
+        cooldown = dc.login_lockout_remaining(ip)
+        if cooldown:
+            flash(f"Too many failed login attempts. Try again in {cooldown}s.", "error")
+        else:
+            username = request.form.get("username", "")
+            password = request.form.get("password", "")
+            env = dc.read_env()
+            if username == env.get("ADMIN_UI_USERNAME") and check_password_hash(env.get("ADMIN_UI_PASSWORD_HASH", ""), password):
+                dc.clear_login_attempts(ip)
+                session.clear()
+                session["logged_in"] = True
+                session.permanent = True
+                return redirect(url_for("dashboard"))
+            dc.record_failed_login(ip)
+            flash("Invalid username or password.", "error")
     return render_template("login.html")
 
 

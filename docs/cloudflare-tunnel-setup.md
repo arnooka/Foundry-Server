@@ -83,8 +83,65 @@ unless you deliberately reconfigure the Public Hostname.
 
 ## What the tunnel can and can't see
 
-`cloudflared` only knows about the one Public Hostname → `http://nginx:80`
-mapping you created in step 4. It has no route to `nginx:8080` (the admin
-vhost) at all, because that port was never configured as a destination. See
+By default, `cloudflared` only knows about the one Public Hostname →
+`http://nginx:80` mapping you created in step 4. It has no route to
+`nginx:8080` (the admin vhost) at all, because that port was never
+configured as a destination. See
 [Architecture](architecture.md#why-two-nginx-vhosts-not-one) for the full
-reasoning behind keeping the admin UI off any public path.
+reasoning behind keeping the admin UI off any public path by default.
+
+## Exposing the admin UI (optional)
+
+You can add a second Public Hostname on the same tunnel - e.g.
+`admin.yourdomain.com` → Service `HTTP`, URL `nginx:8080` - to reach the
+admin UI without being on the LAN. Nothing else needs to change: `admin.conf`
+already has its own vhost and login, and `cloudflared` can already reach
+`nginx:8080` over the `foundry-net` Docker network regardless of the host
+port mapping.
+
+Do this deliberately, though: `config-ui` holds the Docker socket (see
+[Architecture](architecture.md#why-config-ui-needs-the-docker-socket)), so
+its login is effectively the only thing between the internet and full
+control of this host. The app has its own defenses - CSRF tokens, a
+per-IP login lockout, rate limiting at the nginx layer - but none of that
+is a substitute for the two things below:
+
+1. **Put a Cloudflare Access policy in front of the admin hostname.** This
+   gates the request *before* it ever reaches nginx or Flask - a stolen or
+   brute-forced admin password alone isn't enough to get in.
+
+   In the Cloudflare dashboard: **Zero Trust** → **Access controls** →
+   **Applications** → **Add an application** → **Self-hosted and private**
+   → **Public DNS** tab → **Continue with Self-hosted and private**.
+   - **Destinations:** under Public hostnames, enter the admin subdomain
+     (e.g. `admin`) and pick your domain - this should match the Public
+     Hostname you already created on the tunnel, not a new one.
+   - **Access policies:** click **Create new policy**. Give it any name
+     (e.g. `Admins only`), leave **Action** as `Allow`, and under the
+     **Include** rule set the selector to `Emails` and the value to your own
+     email address. Add another `Emails` include rule per person if more
+     than one of you needs access - matching any one rule is enough to get
+     in. Save the policy.
+   - **Authentication:** the defaults (accept all available identity
+     providers) are fine - Cloudflare will email a one-time PIN to whatever
+     address the visitor enters, and only the email(s) from your policy
+     above will be let through.
+   - **Details:** name it whatever you like, and optionally shorten
+     **Session Duration** from the 24-hour default if you want to be
+     re-prompted more often.
+   - Click **Create**.
+
+   Once saved, visiting the admin hostname prompts for that email + PIN
+   first; only after that does the request reach the Foundry Admin UI's own
+   username/password login, unchanged.
+2. **Use a strong, unique admin password**, and keep `.env` off any machine
+   or backup you don't fully control - it holds `ADMIN_UI_PASSWORD_HASH`,
+   `FLASK_SECRET_KEY` (which can forge a logged-in session if it leaks), and
+   your `CLOUDFLARE_TUNNEL_TOKEN`. It's already excluded via `.gitignore`;
+   don't paste its contents anywhere, including into chat tools or issue
+   trackers.
+
+If you'd rather not manage an Access policy, leave the admin UI on the LAN
+side only and use `docker compose exec`/SSH to your host when you need it
+remotely - the port-8080-never-a-tunnel-destination default is the safer
+choice for anyone who doesn't need remote admin access often.

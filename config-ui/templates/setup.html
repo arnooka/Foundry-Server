@@ -16,6 +16,7 @@
 
     <div class="wizard-viewport">
         <form method="post" autocomplete="off">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="wizard-track">
 
                 <section class="wizard-step">
