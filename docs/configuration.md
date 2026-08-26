@@ -88,6 +88,24 @@ for how to generate one.
 World folder name to launch automatically on container start. Leave blank to
 land on Foundry's setup/world-selection screen instead.
 
+#### `FOUNDRY_ASSETS_PATH`
+Optional. An absolute path on this machine (e.g. `C:\Users\you\FoundryAssets`
+on Windows, `/home/you/foundry-assets` on Linux/Mac) to bind-mount straight
+into the `foundry` container at `Data/Mount`, so its contents show up in
+Foundry's own file picker without uploading them by hand. Named `Mount`
+rather than something like `assets` so it's obviously the folder from your
+machine, not something Foundry itself created inside its own data volume.
+Drop map images, tokens, music, etc. into that folder from your normal file
+explorer and they're there after the next restart - no need to re-mount or
+re-copy anything. Leave blank and nothing extra is mounted.
+
+Under the hood this writes a small `docker-compose.assets.yml` override file
+next to `docker-compose.yml` (gitignored, regenerated automatically - don't
+edit it by hand) rather than a line in `docker-compose.yml` itself, since
+`config-ui` drives `docker compose` from inside its own container over the
+Docker socket, where a relative path here would resolve incorrectly. Use an
+absolute path, not a relative one.
+
 #### `FOUNDRY_LANGUAGE`
 Language code plus the module that provides its translation, e.g. `en.core`
 (the default) or `fr.core`. Not a small fixed list in the dashboard - which
@@ -127,7 +145,10 @@ it blank and the dashboard just won't show a link.
 
 ## Admin UI account
 
-Set by the app itself, not by hand. See
+Set by the app itself, not by hand. LAN-accessible by default; see
+[Cloudflare Tunnel Setup: exposing the admin UI](cloudflare-tunnel-setup.md#exposing-the-admin-ui)
+if you've deliberately routed it through a Cloudflare Access-gated subdomain
+instead. See
 [Admin UI Guide: First-run setup](admin-ui-guide.md#first-run-setup). Listed
 here only so you know what they are, in case you ever need to reset one
 manually per

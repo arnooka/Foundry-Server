@@ -105,8 +105,9 @@ After logging in you'll see:
   has no local API to query this live the way ngrok did, so this is just an
   echo of what you set in `.env`, not a health check of the tunnel itself.
 - **Foundry Settings wizard**: one step per group of related fields (version
-  & world, server identity & admin access - including your license key, your
-  foundryvtt.com account, and Cloudflare domain - see
+  & world, a shared assets folder mounted in from this machine, server
+  identity & admin access - including your license key, your foundryvtt.com
+  account, and Cloudflare domain - see
   [Configuration Reference](configuration.md#foundry-vtt) and
   [Cloudflare Tunnel](configuration.md#cloudflare-tunnel)), ending in a
   **Save & Restart** button. A few fields are required before it'll save -

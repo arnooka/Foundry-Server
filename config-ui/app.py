@@ -20,6 +20,20 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
 )
+# Self-heals the generated assets bind-mount file against .env on every
+# startup, in case they've drifted (a manual .env edit, or the file being
+# deleted). See sync_assets_mount for why this can't just be a line in
+# docker-compose.yml's own volumes: list.
+dc.sync_assets_mount(dc.read_env().get("FOUNDRY_ASSETS_PATH", ""))
+
+
+def is_localhost_request() -> bool:
+    """Whether the browser reached this page via localhost/127.0.0.1/::1,
+    as opposed to a LAN IP or the admin subdomain. nginx forwards the
+    original Host header unmodified (proxy_set_header Host $host in
+    admin.conf), so this reflects what the visitor actually typed/clicked,
+    not the docker network's internal hostname."""
+    return request.host.split(":")[0].lower() in ("localhost", "127.0.0.1", "::1")
 
 
 def client_ip() -> str:
@@ -251,7 +265,7 @@ def api_traffic():
 def settings():
     return render_template(
         "settings.html",
-        steps=dc.SETTINGS_STEPS,
+        steps=dc.settings_steps(is_localhost_request()),
         env_values=dc.read_env(),
         required_fields=dc.REQUIRED_SETTINGS_FIELDS,
     )
@@ -292,6 +306,7 @@ def save():
             updates[key] = value
 
     dc.write_env(updates)
+    dc.sync_assets_mount(updates.get("FOUNDRY_ASSETS_PATH", previous.get("FOUNDRY_ASSETS_PATH", "")))
 
     # Text fields round-trip through the form on every submit whether or not
     # they were touched, so "key present in updates" alone would restart
